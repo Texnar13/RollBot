@@ -352,9 +352,9 @@ public class RollBot extends ListenerAdapter {
                 )).queue();
 
                 // спим 2 секунды
-                try{
+                try {
                     Thread.sleep(2000);
-                }catch (InterruptedException e){
+                } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
@@ -362,12 +362,12 @@ public class RollBot extends ListenerAdapter {
                 event.getJDA().getPresence().setStatus(OnlineStatus.OFFLINE);
 
                 // спим 2 секунды
-                try{
+                try {
                     Thread.sleep(2000);
-                }catch (InterruptedException e){
+                } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                
+
                 System.exit(0);
             }
         }
@@ -436,7 +436,6 @@ public class RollBot extends ListenerAdapter {
 
     int roll(int n) {
         if (n <= 0) throw new java.lang.NumberFormatException();
-        //return (int) Math.round((Math.random() * (n - 1))) + 1;
         return (r.nextInt(n)) + 1;
     }
 
@@ -629,7 +628,6 @@ public class RollBot extends ListenerAdapter {
             int twentyTwentiesCount = currentPlayer.allNumberOfTwenties / 20;
 
 
-
             // меняем данные игрока
             currentPlayer.numberOfOnes += numberOfOnes;
             currentPlayer.numberOfTwenties += numberOfTwenties;
@@ -657,90 +655,35 @@ public class RollBot extends ListenerAdapter {
 
 
     Point getData(long guildId, long memberId) {
-
-// достать данные
-//        JsonElement jsonElement = JsonParser.parseString("{\"message\":\"Hi\",\"place\":{\"name\":\"World!\"}}");
-//
-//        JsonObject rootObject = jsonElement.getAsJsonObject(); // чтение главного объекта
-//        String message = rootObject.get("message").getAsString(); // получить поле "message" как строку
-//        JsonObject childObject = rootObject.getAsJsonObject("place"); // получить объект Place
-//        String place = childObject.get("name").getAsString(); // получить поле "name"
-//        System.out.println(message + " " + place); // напечатает "Hi World!"*/
-
-
-//
-//
-//        // парсим данные в обьект
-//        JsonObject rootObject = new JsonObject(); // создаем главный объект
-//        rootObject.addProperty("message", "Hi"); // записываем текст в поле "message"
-//        JsonObject childObject = new JsonObject(); // создаем объект Place
-//        childObject.addProperty("name", "World!"); // записываем текст в поле "name" у объект Place
-//        rootObject.add("place", childObject); // сохраняем дочерний объект в поле "place"
-//
-//        Gson gson = new Gson();
-//        String json = gson.toJson(rootObject); // генерация json строки
-//        System.out.println(json); // напечатает "{"message":"Hi","place":{"name":"World!"}}"
-
-/*
-{
-  "version_code":"1",
-  "guilds":
-  [
-    {
-      "_id":"getGuild().getId()",
-      "members":[
+        /* пример структуры одного сервера:
         {
-          "_id":"getAuthor().getId()"
-          "pointers_count":"какое-нибудь количество очков"
+          "version_code":"1",
+          "_id":"getGuild().getId()",
+          "members":[
+            {
+              "_id":"getAuthor().getId()"
+              "number_of_ones":1,
+              "number_of_twenties":1
+            }, ...
+          ]
         }
-      ]
-    }
-  ]
-}
+        */
 
-
-
-
-{
-  "version_code":"1",
-  "_id":"getGuild().getId()",
-  "members":[
-    {
-      "_id":"getAuthor().getId()"
-      "pointers_count":"какое-нибудь количество очков"
-    }
-  ]
-}
-
-{
-  "version_code":"1",
-  "_id":"689098857849552926",
-  "members":[
-    {
-      "_id":517628304967204876,
-      "number_of_ones":1,
-      "number_of_twenties":1
-    }
-  ]
-}
-
-*/
         try {
 
             // объект корневого каталога
             File rootDir = new File("__saved_data");
+            // создаем папку, если ее нет
             if (rootDir.mkdir()) {
                 System.out.println(TAG + ": Directory created");
             }
 
-
-            // файл с данными конкретной гильдии
+            // файл с данными конкретной гильдии по id гильдии
             File guild_data = new File(rootDir, guildId + ".txt");
-
+            // если файла такой гильдии нет, создаем его
             if (guild_data.createNewFile()) {
                 System.out.println(TAG + ": New file " + guildId + ".txt created!");
             }
-
 
             // читаем данные из файла
             FileReader reader = new FileReader(guild_data);
@@ -751,7 +694,6 @@ public class RollBot extends ListenerAdapter {
             }
             reader.close();
 
-
             // преобразуем данные из файла в json
             // чтение главного объекта
             JsonObject rootObject;
@@ -759,7 +701,6 @@ public class RollBot extends ListenerAdapter {
             try {
                 rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
                 membersObject = rootObject.getAsJsonArray("members");
-
 
                 // находим участника
                 for (int i = 0; i < membersObject.size(); i++) {
@@ -1034,3 +975,28 @@ class RollAnswer {
 // helpful code:
 // event.getAuthor().getName() + event.getAuthor().getDiscriminator()
 //event.getMessage().addReaction("\uD83C\uDFB2").queue();//":game_die:"
+
+
+//      // достать данные
+//      JsonElement jsonElement = JsonParser.parseString("{\"message\":\"Hi\",\"place\":{\"name\":\"World!\"}}");
+//
+//      JsonObject rootObject = jsonElement.getAsJsonObject(); // чтение главного объекта
+//      String message = rootObject.get("message").getAsString(); // получить поле "message" как строку
+//      JsonObject childObject = rootObject.getAsJsonObject("place"); // получить объект Place
+//      String place = childObject.get("name").getAsString(); // получить поле "name"
+//      System.out.println(message + " " + place); // напечатает "Hi World!"*/
+
+
+//
+//
+//      // парсим данные в обьект
+//      JsonObject rootObject = new JsonObject(); // создаем главный объект
+//      rootObject.addProperty("message", "Hi"); // записываем текст в поле "message"
+//      JsonObject childObject = new JsonObject(); // создаем объект Place
+//      childObject.addProperty("name", "World!"); // записываем текст в поле "name" у объект Place
+//      rootObject.add("place", childObject); // сохраняем дочерний объект в поле "place"
+//
+//      Gson gson = new Gson();
+//      String json = gson.toJson(rootObject); // генерация json строки
+//      System.out.println(json); // напечатает "{"message":"Hi","place":{"name":"World!"}}"
+
