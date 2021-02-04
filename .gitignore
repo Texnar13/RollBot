@@ -1,0 +1,8 @@
+# Project exclude paths
+/.gradle/
+/build/
+/build/classes/java/main/
+# token data
+src/main/java/TokenClass.java
+# gamers data yay
+/__saved_data
