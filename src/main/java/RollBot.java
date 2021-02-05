@@ -159,10 +159,8 @@ public class RollBot extends ListenerAdapter {
         List<Guild> temp = event.getJDA().getGuilds();
         guilds = new GuildData[temp.size()];
         for (int i = 0; i < temp.size(); i++) {
-            guilds[i] = new GuildData(temp.get(i).getIdLong());
-
-            // загружаем данные игроков из сохранения
-            getData(guilds[i]);
+            // загружаем данные оп одной гильдии(серверу)
+            guilds[i] = getGuildDataFromFileByGuildId(temp.get(i).getIdLong());
         }
 
     }
@@ -170,31 +168,34 @@ public class RollBot extends ListenerAdapter {
     // метод отрабатывающий при получении сообщения
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
+        System.out.println("-----");// красивый разделитель
+
+        String msg = getUNICODE(event.getMessage().getContentDisplay());
 
         // выводим сообщение в лог
         if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
             System.out.printf(TAG + ":[Private] %s: %s\n",
                     getUNICODE(event.getAuthor().getName()),
-                    getUNICODE(event.getMessage().getContentDisplay())
+                    msg
             );
 
         } else {// сообщение с сервера
             System.out.printf(
-                    TAG + ":[ Server ][%s][%s] %s(%s): %s\n",
+                    TAG + ":[Server][%s][%s] %s(%s): %s\n",
                     getUNICODE(event.getGuild().getName()), // гильдия (сервер)
                     getUNICODE(event.getTextChannel().getName()), // канал
                     getUNICODE(Objects.requireNonNull(event.getMember()).getEffectiveName()),// никнейм специфичный для данной гильдии написавшего
                     getUNICODE(event.getAuthor().getName()), // имя написавшего
-                    getUNICODE(event.getMessage().getContentDisplay()) // сообщение
+                    msg // сообщение
             );
 
-            // отфильтровываем сообщения только в нужном канале
-            if (
-                    getUNICODE(event.getGuild().getName()).equals("РоллПати") &&
-                            !getUNICODE(event.getTextChannel().getName()).equals("кидальня-костей")
-            ) {
-                return;
-            }
+            // отфильтровываем сообщения только в нужном канале (если такая настройка стоит)
+            long currentChannelId = getGuildFromListById(event.getGuild().getIdLong()).rollChannelId;
+            if (currentChannelId != -1)
+                if (currentChannelId != event.getChannel().getIdLong()) {// настройка есть, но канал не тот
+                    if (!msg.equals("/bind"))
+                        return;
+                }
         }
 
         // отфильтровываем сообщения от самого бота и пустые сообщения
@@ -202,9 +203,8 @@ public class RollBot extends ListenerAdapter {
             return;
         }
 
-
+//todo сделать получение гильдии только в одном месте? getGuildFromListById
         // =========================================== команда для бота (для всех чатов) ===========================================
-        String msg = getUNICODE(event.getMessage().getContentDisplay());
         if (msg.charAt(0) == '/') {
 
             // ------------------------------------------ кинуть кость ------------------------------------------
@@ -308,32 +308,23 @@ public class RollBot extends ListenerAdapter {
             if (msg.equals("/help")) {
                 event.getChannel().sendMessage(getUTF_8("Привет, я " + TAG +
                         "\n Вот список доступных команд:" +
-                        "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N)," +
-                        "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ " +
-                        "\n\t\t\t(Поддерживаются + * / - dN KdN. Скобки пока не поддерживаются!)," +
-                        "\n\t\t/stat - количество двадцаток и единиц за текущую игру," +
-                        "\n\t\t/help - показ этого сообщения," +
-                        "\n\t\t/exit - завершение работы бота"
+                        "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
+                        "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
+                        "\n\t\t\t(Поддерживаются + * / - dN KdN. Скобки пока не поддерживаются!);" +
+                        "\n\t\t/stat - количество двадцаток и единиц за текущую игру;" +
+                        "\n\t\t/help - показ этого сообщения;" +
+                        "\n\t\t/bind - назначить канал для костей, писать в нужном канале;" +
+                        "\n\t\t/exit - завершение работы бота;"
                 )).queue();
             }
 
-            // ------------------------------------------ отладочный  ------------------------------------------
-            if (msg.equals("/inf") && !event.isFromType(ChannelType.PRIVATE)) {
-                StringBuilder answer = new StringBuilder("Сервер: ")
-                        .append(getUNICODE(event.getGuild().getName()))
-                        .append(" (")
-                        .append(event.getGuild().getIdLong())
-                        .append(")\nУчастники онлайн:");
-
-                List<Member> members = event.getGuild().getMembers();
-                for (Member member : members) {
-                    answer.append("\n\t ")
-                            .append(getUNICODE(member.getEffectiveName()))
-                            .append(" (")
-                            .append(member.getIdLong())
-                            .append(')');
-                }
-                event.getChannel().sendMessage(getUTF_8(answer.toString())).queue();
+            // ---------------------------------------- смена кидальни ----------------------------------------
+            if (msg.equals("/bind")) {
+                // устанавливаем канал для работы бота на этом сервере
+                GuildData guild = getGuildFromListById(event.getGuild().getIdLong());
+                setRollChannel(guild, event.getChannel().getIdLong());
+                // говорим об этом пользователю
+                event.getChannel().sendMessage(getUTF_8("С этого момента кости кидаются только тут")).queue();
             }
 
             // ------------------------------------------ команда выхода ------------------------------------------
@@ -370,69 +361,30 @@ public class RollBot extends ListenerAdapter {
 
                 System.exit(0);
             }
-        }
 
-    }
+            // ------------------------------------------ отладочный  ------------------------------------------
+            if (msg.equals("/inf") && !event.isFromType(ChannelType.PRIVATE)) {
+                StringBuilder answer = new StringBuilder("Сервер: ")
+                        .append(getUNICODE(event.getGuild().getName()))
+                        .append(" (")
+                        .append(event.getGuild().getIdLong())
+                        .append(")\nУчастники онлайн:");
 
-
-    String getUNICODE(String utf8String) {
-        // строку utf-8 в байт массив, а затем байт массив в Unicode
-        return new String(utf8String.getBytes(UTF_8));
-    }
-
-    String getUTF_8(String unicodeString) {
-        // строку Unicode в байт массив, а затем байт массив в utf-8
-        return new String(unicodeString.getBytes(), UTF_8);
-    }
-
-    String getAuthorName(MessageReceivedEvent event) {
-        if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
-            return getUNICODE(event.getAuthor().getName());
-        } else {// сообщение с сервера (обращаемся по нику а не по имени)
-            return getUNICODE(Objects.requireNonNull(event.getMember()).getEffectiveName());
-        }
-    }
-
-    StringBuilder getTextInt(int n) {
-        // создаем строку вывода
-        StringBuilder answer = new StringBuilder();
-        // выводим цифры
-        if (n != 0) {
-            // ставим отрицательный знак если он есть
-            boolean isNegative = false;
-            if (n < 0) {
-                isNegative = true;
-                n = -n;
-            }
-            // разбиваем число на цифры
-            int[] numbers = new int[String.valueOf(n).length()];
-            for (int i = 0; i < numbers.length; i++) {
-                numbers[i] = n % 10;
-                n /= 10;
-            }
-            // выводим пять строк
-            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
-                // выводим отрицательный знак, если он есть
-                if (isNegative) {
-                    answer.append(NUMBERS_CODES[10][linesIterator]).append("  ");
+                List<Member> members = event.getGuild().getMembers();
+                for (Member member : members) {
+                    answer.append("\n\t ")
+                            .append(getUNICODE(member.getEffectiveName()))
+                            .append(" (")
+                            .append(member.getIdLong())
+                            .append(')');
                 }
-                // выводим число наоборот
-                for (int numbersIterator = numbers.length - 1; numbersIterator >= 0; numbersIterator--) {
-                    answer.append(NUMBERS_CODES[numbers[numbersIterator]][linesIterator]).append("  ");
-                }
-                // завершаем строку
-                answer.append("\n");
-            }
-        } else {
-            // выводим пять строк нуля
-            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
-                answer.append(NUMBERS_CODES[0][linesIterator]).append("  ").append("\n");
+                event.getChannel().sendMessage(getUTF_8(answer.toString())).queue();
             }
         }
 
-        // возвращаем результат
-        return answer;
     }
+
+    // =========================================== кости ===========================================
 
     int roll(int n) {
         if (n <= 0) throw new java.lang.NumberFormatException();
@@ -618,7 +570,7 @@ public class RollBot extends ListenerAdapter {
                 currentPlayer = new PlayerData();
                 currentPlayer.playerId = event.getAuthor().getIdLong();
                 currentGuild.playersCurrentData.add(currentPlayer);
-                Point save = getData(event.getGuild().getIdLong(), event.getAuthor().getIdLong());
+                Point save = getPlayerPointsFromFileById(event.getGuild().getIdLong(), event.getAuthor().getIdLong());// todo разобраться что делает этот метод и дать ему нормальное имя!
                 currentPlayer.allNumberOfOnes = save.numberOfOnes;
                 currentPlayer.allNumberOfTwenties = save.numberOfTwenties;
             }
@@ -634,7 +586,7 @@ public class RollBot extends ListenerAdapter {
             currentPlayer.allNumberOfOnes += numberOfOnes;
             currentPlayer.allNumberOfTwenties += numberOfTwenties;
             // добавляем данные так же и в файле
-            saveData(
+            addPointsInFileById(
                     event.getGuild().getIdLong(),
                     event.getAuthor().getIdLong(),
                     numberOfOnes,
@@ -653,12 +605,112 @@ public class RollBot extends ListenerAdapter {
 
     }
 
+    // =================================== вспомогательные методы ===================================
 
-    Point getData(long guildId, long memberId) {
+    String getUNICODE(String utf8String) {
+        // строку utf-8 в байт массив, а затем байт массив в Unicode
+        return new String(utf8String.getBytes(UTF_8));
+    }
+
+    String getUTF_8(String unicodeString) {
+        // строку Unicode в байт массив, а затем байт массив в utf-8
+        return new String(unicodeString.getBytes(), UTF_8);
+    }
+
+    StringBuilder getTextInt(int n) {
+        // создаем строку вывода
+        StringBuilder answer = new StringBuilder();
+        // выводим цифры
+        if (n != 0) {
+            // ставим отрицательный знак если он есть
+            boolean isNegative = false;
+            if (n < 0) {
+                isNegative = true;
+                n = -n;
+            }
+            // разбиваем число на цифры
+            int[] numbers = new int[String.valueOf(n).length()];
+            for (int i = 0; i < numbers.length; i++) {
+                numbers[i] = n % 10;
+                n /= 10;
+            }
+            // выводим пять строк
+            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
+                // выводим отрицательный знак, если он есть
+                if (isNegative) {
+                    answer.append(NUMBERS_CODES[10][linesIterator]).append("  ");
+                }
+                // выводим число наоборот
+                for (int numbersIterator = numbers.length - 1; numbersIterator >= 0; numbersIterator--) {
+                    answer.append(NUMBERS_CODES[numbers[numbersIterator]][linesIterator]).append("  ");
+                }
+                // завершаем строку
+                answer.append("\n");
+            }
+        } else {
+            // выводим пять строк нуля
+            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
+                answer.append(NUMBERS_CODES[0][linesIterator]).append("  ").append("\n");
+            }
+        }
+
+        // возвращаем результат
+        return answer;
+    }
+
+    String getAuthorName(MessageReceivedEvent event) {
+        if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
+            return getUNICODE(event.getAuthor().getName());
+        } else {// сообщение с сервера (обращаемся по нику а не по имени)
+            return getUNICODE(Objects.requireNonNull(event.getMember()).getEffectiveName());
+        }
+    }
+
+    GuildData getGuildFromListById(long guildId) {
+        // определяем текущую гильдию
+        for (GuildData guild : guilds) {
+            if (guild.guildId == guildId) {
+                return guild;
+            }
+        }
+        return null;
+    }
+
+    // ========================================= хранилище =========================================
+
+    Point getPlayerPointsFromFileById(long guildId, long memberId) {
+        try {
+            // получаем данные из файла в json
+            JsonObject rootObject = getGuildJsonDataFromFileById(guildId);
+            JsonArray membersObject = rootObject.getAsJsonArray("members");
+
+            // находим участника
+            for (int i = 0; i < membersObject.size(); i++) {
+                // получаем одного участника и проверяем не его ли это id
+                if (membersObject.get(i).getAsJsonObject().get("_id").getAsLong() == memberId) {
+                    // получаем ответ
+                    return new Point(
+                            membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt(),
+                            membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt()
+                    );
+                }
+            }
+            // игрока в сохраненных нет, возвращаем нули
+            return new Point(0, 0);
+
+        } catch (IllegalStateException | IOException e) {
+            e.printStackTrace();
+            // игрока в сохраненных нет, возвращаем нули
+            return new Point(0, 0);
+        }
+    }
+
+    GuildData getGuildDataFromFileByGuildId(long guildId) {
         /* пример структуры одного сервера:
         {
           "version_code":"1",
           "_id":"getGuild().getId()",
+          "roll_channel":"event.getChannel().getIdLong()",    (канал, в котором можно кидать кости)
           "members":[
             {
               "_id":"getAuthor().getId()"
@@ -669,197 +721,83 @@ public class RollBot extends ListenerAdapter {
         }
         */
 
+        // переданный id устанавливаем в созданный обьект гильдии
+        GuildData guild = new GuildData(guildId);
         try {
+            // получаем данные из файла в json
+            JsonObject rootObject = getGuildJsonDataFromFileById(guild.guildId);
 
-            // объект корневого каталога
-            File rootDir = new File("__saved_data");
-            // создаем папку, если ее нет
-            if (rootDir.mkdir()) {
-                System.out.println(TAG + ": Directory created");
-            }
-
-            // файл с данными конкретной гильдии по id гильдии
-            File guild_data = new File(rootDir, guildId + ".txt");
-            // если файла такой гильдии нет, создаем его
-            if (guild_data.createNewFile()) {
-                System.out.println(TAG + ": New file " + guildId + ".txt created!");
-            }
-
-            // читаем данные из файла
-            FileReader reader = new FileReader(guild_data);
-            StringBuilder contains = new StringBuilder();
-            int c;
-            while ((c = reader.read()) != -1) {
-                contains.append((char) c);
-            }
-            reader.close();
-
-            // преобразуем данные из файла в json
-            // чтение главного объекта
-            JsonObject rootObject;
-            JsonArray membersObject;
+            // получаем id канала для роллов (опционально)
+            guild.rollChannelId = -1;
             try {
-                rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
-                membersObject = rootObject.getAsJsonArray("members");
-
-                // находим участника
-                for (int i = 0; i < membersObject.size(); i++) {
-                    // получаем одного участника и проверяем не его ли это id
-                    if (membersObject.get(i).getAsJsonObject().get("_id").getAsLong() == memberId) {
-                        // получаем ответ
-                        return new Point(
-                                membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt(),
-                                membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt()
-                        );
-                    }
-                }
-                // игрока в сохраненных нет, возвращаем нули
-                return new Point(0, 0);
-
-            } catch (java.lang.IllegalStateException e) {
-                e.printStackTrace();
-                // игрока в сохраненных нет, возвращаем нули
-                return new Point(0, 0);
+                guild.rollChannelId = rootObject.get("roll_channel").getAsLong();
+            } catch (java.lang.NumberFormatException e) {
+                System.out.println(TAG + ": guild=" + guildId + " no roll_channel = " +
+                        rootObject.get("roll_channel").getAsString());
             }
+
+            // получаем массив участников
+            JsonArray membersObject = rootObject.getAsJsonArray("members");
+            for (int i = 0; i < membersObject.size(); i++) {
+
+                // получаем одного участника
+                PlayerData player = new PlayerData();
+                player.playerId = membersObject.get(i).getAsJsonObject().get("_id").getAsLong();
+                player.allNumberOfOnes = membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt();
+                player.allNumberOfTwenties = membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt();
+                guild.playersCurrentData.add(player);
+            }
+
+        } catch (IllegalStateException | IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return guild;
+    }
+
+    void setRollChannel(GuildData guild, long channelId) {
+        // назначаем
+        guild.rollChannelId = channelId;
+        // сохраняем в файл
+        try {
+            // получаем данные из файла в json
+            JsonObject rootObject = getGuildJsonDataFromFileById(guild.guildId);
+
+            // меняем значения на новые
+            rootObject.addProperty("roll_channel", Long.toString(guild.rollChannelId));
+
+            // пишем json в файл
+            saveGuildGsonDataInFile(guild.guildId, rootObject);
 
         } catch (IOException e) {
             e.printStackTrace();
-            // игрока в сохраненных нет, возвращаем нули
-            return new Point(0, 0);
         }
-
     }
 
-    void getData(GuildData guild) {
+    void addPointsInFileById(long guildId, long memberId, int appendNumberOfOnes, int appendNumberOfTwenties) {
+        System.out.println(TAG + ":addPointsInFileById g:" + guildId + " p:" + memberId);
 
         try {
-
-            // объект корневого каталога
-            File rootDir = new File("__saved_data");
-            if (rootDir.mkdir()) {
-                System.out.println(TAG + ": Directory created");
-            }
-
-
-            // файл с данными конкретной гильдии
-            File guild_data = new File(rootDir, guild.guildId + ".txt");
-
-            if (guild_data.createNewFile()) {
-                System.out.println(TAG + ": New file " + guild.guildId + ".txt created!");
-            }
-
-
-            // читаем данные из файла
-            FileReader reader = new FileReader(guild_data);
-            StringBuilder contains = new StringBuilder();
-            int c;
-            while ((c = reader.read()) != -1) {
-                contains.append((char) c);
-            }
-            reader.close();
-
-
-            // преобразуем данные из файла в json
-            // чтение главного объекта
-            JsonObject rootObject;
-            JsonArray membersObject;
-            try {
-                rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
-                membersObject = rootObject.getAsJsonArray("members");
-
-                // пробегаемся по всем участникам
-                for (int i = 0; i < membersObject.size(); i++) {
-
-                    // получаем одного участника
-                    PlayerData player = new PlayerData();
-                    player.playerId = membersObject.get(i).getAsJsonObject().get("_id").getAsLong();
-                    player.allNumberOfOnes = membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt();
-                    player.allNumberOfTwenties = membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt();
-                    guild.playersCurrentData.add(player);
-                }
-
-            } catch (java.lang.IllegalStateException e) {
-                //e.printStackTrace();
-            }
-
-        } catch (IOException e) {
-            //e.printStackTrace();
-        }
-
-    }
-
-    void saveData(long guildId, long memberId, int appendNumberOfOnes, int appendNumberOfTwenties) {
-        System.out.println(TAG + ":saveData g:" + guildId + " p:" + memberId);
-
-        try {
-
-            // объект корневого каталога
-            File rootDir = new File("__saved_data");
-            if (rootDir.mkdir()) {
-                System.out.println(TAG + ": Directory created");
-            }
-
-
-            // файл с данными конкретной гильдии
-            File guild_data = new File(rootDir, guildId + ".txt");
-
-            if (guild_data.createNewFile()) {
-                System.out.println(TAG + ": New file " + guildId + ".txt created!");
-            }
-
-
-            // читаем данные из файла
-            FileReader reader = new FileReader(guild_data);
-            StringBuilder contains = new StringBuilder();
-            int c;
-            while ((c = reader.read()) != -1) {
-                contains.append((char) c);
-            }
-            reader.close();
-
-
-            // преобразуем данные из файла в json
-            // чтение главного объекта
-            JsonObject rootObject;
-            JsonArray membersObject;
-            try {
-                rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
-                membersObject = rootObject.getAsJsonArray("members");
-
-            } catch (java.lang.IllegalStateException e) {
-                e.printStackTrace();
-                // создание новой структуры
-                System.out.println(TAG + ": create new json structure");
-                rootObject = new JsonObject();
-                rootObject.addProperty("version_code", "1");
-                rootObject.addProperty("_id", "" + guildId);
-
-                membersObject = new JsonArray();
-                rootObject.add("members", membersObject);
-
-            }
-
+            // получаем данные из файла в json
+            JsonObject rootObject = getGuildJsonDataFromFileById(guildId);
+            JsonArray membersObject = rootObject.getAsJsonArray("members");
 
             // пополняем json новыми данными
             boolean writeFlag = false;
-            for (int i = 0; i < membersObject.size(); i++) {
+            for (int i = 0; i < membersObject.size() && !writeFlag; i++) {
                 // получаем одного участника и проверяем не его ли это id
                 if (membersObject.get(i).getAsJsonObject().get("_id").getAsLong() == memberId) {
                     // меняем значения на новые
                     membersObject.get(i).getAsJsonObject().addProperty(
                             "number_of_ones",
-                            membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt() + appendNumberOfOnes
-                    );
-
+                            membersObject.get(i).getAsJsonObject().get("number_of_ones").getAsInt() + appendNumberOfOnes);
                     membersObject.get(i).getAsJsonObject().addProperty(
                             "number_of_twenties",
-                            membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt() + appendNumberOfTwenties
-                    );
+                            membersObject.get(i).getAsJsonObject().get("number_of_twenties").getAsInt() + appendNumberOfTwenties);
                     writeFlag = true;
-                    break;
                 }
             }
-            // создаем нового участника
+            // создаем нового участника если необходимо
             if (!writeFlag) {
                 JsonObject newMember = new JsonObject();
                 newMember.addProperty("_id", memberId);
@@ -870,15 +808,8 @@ public class RollBot extends ListenerAdapter {
 
             }
 
-
             // пишем json в файл
-            String data = new Gson().toJson(rootObject);
-            FileWriter writer = new FileWriter(guild_data);
-            writer.append(data);
-            writer.flush();
-
-            // закрываем файл
-            writer.close();
+            saveGuildGsonDataInFile(guildId, rootObject);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -886,15 +817,70 @@ public class RollBot extends ListenerAdapter {
 
     }
 
+    // получаем json структуру из файла сервера, если структуры нет, создаем пустую json (без сохранения в файл)
+    JsonObject getGuildJsonDataFromFileById(long guildId) throws IOException {
 
-    GuildData getGuildFromListById(long guildId) {
-        // определяем текущую гильдию
-        for (GuildData guild : guilds) {
-            if (guild.guildId == guildId) {
-                return guild;
-            }
+        // получаем папку с данными
+        File rootDir = new File("__saved_data");
+        if (rootDir.mkdir()) {
+            System.out.println(TAG + ": Directory created");
         }
-        return null;
+        // файл с данными конкретной гильдии
+        File guild_data = new File(rootDir, guildId + ".txt");
+        // если файла нет, создаем его
+        if (guild_data.createNewFile()) {
+            System.out.println(TAG + ": New file " + guildId + ".txt created!");
+        }
+        // читаем текст из файла сохраняя в строку
+        FileReader reader = new FileReader(guild_data);
+        StringBuilder contains = new StringBuilder();
+        int c;
+        while ((c = reader.read()) != -1) {
+            contains.append((char) c);
+        }
+        reader.close();
+
+
+        // пытаемся прочитать структуру json в файле
+        JsonObject rootObject;
+        try {
+            // чтение главного объекта
+            rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
+        } catch (java.lang.IllegalStateException e) {
+            e.printStackTrace();
+            // если структуры в файле нет, создаем новую со значениями по умолчанию
+            System.out.println(TAG + ": create new json structure");
+            rootObject = new JsonObject();
+            rootObject.addProperty("version_code", "1");
+            rootObject.addProperty("_id", Long.toString(guildId));
+            rootObject.addProperty("roll_channel", "");
+            rootObject.add("members", new JsonArray());
+        }
+
+        return rootObject;
+    }
+
+    // пишем json в файл (json должен быть подготовленным и не пустым)
+    void saveGuildGsonDataInFile(long guildId, JsonObject rootObject) throws IOException {
+        // получаем папку с данными
+        File rootDir = new File("__saved_data");
+        if (rootDir.mkdir()) {
+            System.out.println(TAG + ": Directory created");
+        }
+        // файл с данными конкретной гильдии
+        File guild_data = new File(rootDir, guildId + ".txt");
+        // если файла нет, создаем его
+        if (guild_data.createNewFile()) {
+            System.out.println(TAG + ": New file " + guildId + ".txt created!");
+        }
+        // пишем json в файл
+        String data = new Gson().toJson(rootObject);
+        FileWriter writer = new FileWriter(guild_data);
+        writer.append(data);
+        writer.flush();
+
+        // закрываем файл
+        writer.close();
     }
 
 
@@ -915,6 +901,7 @@ class Point {
 class GuildData {
 
     long guildId;
+    long rollChannelId;
 
     // сведения о количестве единиц и двоек у пользователей кинувших кость в текущей сессии
     ArrayList<PlayerData> playersCurrentData = new ArrayList<>();
