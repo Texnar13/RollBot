@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.ChannelType;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
@@ -108,9 +109,28 @@ public class RollBot extends ListenerAdapter {
             }
     };
 
+    static final String helpUTF8Message = getUTF_8("Привет, я " + TAG +
+            "\n Вот список доступных команд:" +
+            "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
+            "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
+            "\n\t\t\t(Поддерживаются + * / - dN KdN. Скобки пока не поддерживаются!);" +
+            "\n\t\t/help - показ этого сообщения;" +
+            "\n\t\t/exit - завершение работы бота;");
+
+    static final String serverHelpUTF8Message = getUTF_8("Привет, я " + TAG +
+            "\n Вот список доступных команд:" +
+            "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
+            "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
+            "\n\t\t\t(Поддерживаются + * / - dN KdN. Скобки пока не поддерживаются!);" +
+            "\n\t\t/stat - количество двадцаток и единиц за текущую игру;" +
+            "\n\t\t/help - показ этого сообщения;" +
+            "\n\t\t/bind - назначить канал для костей, писать в нужном канале;" +
+            "\n\t\t/exit - завершение работы бота;");
+
+    static final String inputErrorMessage = getUTF_8("Вы ввели некорректное выражение для броска! Читайте /help");
+
     // рандомайзер
     Random r = new Random(System.currentTimeMillis());
-
     // врремя запуска бота
     static long startTimeMillis;
 
@@ -123,27 +143,21 @@ public class RollBot extends ListenerAdapter {
 
         // builder аккаунта бота
         JDABuilder builder = JDABuilder.createDefault(TokenClass.BOT_TOKEN);
-
         // добавляем экземпляр этого класса в качестве обработчика сообщений
         builder.addEventListeners(new RollBot());
 
-        startTimeMillis = System.currentTimeMillis();
-
         // логинимся в дискорде
-        try {
-
-            //аккаунт бота
-            //JDA api =
+        try {// аккаунт бота
             builder.build();
             System.out.println(TAG + ":Log in success!");
-
         } catch (LoginException e) {
             System.out.println(TAG + ":Log in error!");
             e.printStackTrace();
             System.exit(1);
         }
 
-
+        // считываем время начала работы бота
+        startTimeMillis = System.currentTimeMillis();
     }
 
     // отработает 1 раз когда бот проснулся и подключился
@@ -154,6 +168,7 @@ public class RollBot extends ListenerAdapter {
 
         // выставляем статус бота онлайн
         event.getJDA().getPresence().setStatus(OnlineStatus.ONLINE);
+        event.getJDA().getPresence().setActivity(Activity.playing("DnD"));
 
         // получаем гильдии к которым подключен бот
         List<Guild> temp = event.getJDA().getGuilds();
@@ -170,16 +185,43 @@ public class RollBot extends ListenerAdapter {
     public void onMessageReceived(MessageReceivedEvent event) {
         System.out.println("-----");// красивый разделитель
 
+        // получаем текст сообщения
         String msg = getUNICODE(event.getMessage().getContentDisplay());
+        //todo сделать получение гильдии только в одном месте? getGuildFromListById
 
-        // выводим сообщение в лог
-        if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
+        // отфильтровываем сообщения от самого бота и пустые сообщения
+        if (event.getAuthor().isBot() || msg.length() == 0) return;
+
+
+        // ================================== личное сообщение ==================================
+        if (event.isFromType(ChannelType.PRIVATE)) {
+            // выводим сообщение в лог
             System.out.printf(TAG + ":[Private] %s: %s\n",
                     getUNICODE(event.getAuthor().getName()),
                     msg
             );
 
-        } else {// сообщение с сервера
+            // можно писать в каналы веселые сообщения
+            if (msg.startsWith("/fun ")) {
+                try {
+                    event.getJDA().getGuildById(Long.parseLong(msg.substring(5, 23)))
+                            .getTextChannelById(Long.parseLong(msg.substring(24, 42)))
+                            .sendMessage(getUTF_8(msg.substring(42))).queue();
+                } catch (NullPointerException | java.lang.NumberFormatException e) {
+                    e.printStackTrace();
+                    event.getChannel().sendMessage(getUTF_8("error")).queue();
+                }
+                // /fun 503170361903284245 689517268732084238 сообщение
+                // (guild) roll 503170361903284245
+                // (channel) кидальня 689517268732084238
+                // для переноса строк нужно просто вводить enter
+            }
+
+            // помощь
+            if (msg.equals("/help")) event.getChannel().sendMessage(helpUTF8Message).queue();
+
+        } else {
+            // ================================== сообщение с сервера ==================================
             System.out.printf(
                     TAG + ":[Server][%s][%s] %s(%s): %s\n",
                     getUNICODE(event.getGuild().getName()), // гильдия (сервер)
@@ -189,48 +231,123 @@ public class RollBot extends ListenerAdapter {
                     msg // сообщение
             );
 
-            // отфильтровываем сообщения только в нужном канале (если такая настройка стоит)
-            long currentChannelId = getGuildFromListById(event.getGuild().getIdLong()).rollChannelId;
-            if (currentChannelId != -1)
-                if (currentChannelId != event.getChannel().getIdLong()) {// настройка есть, но канал не тот
-                    if (!msg.equals("/bind"))
-                        return;
+            if (msg.charAt(0) == '/') {
+                // отфильтровываем сообщения только в нужном канале (если такая настройка стоит)
+                GuildData guild = getGuildFromListById(event.getGuild().getIdLong());
+                if (guild.rollChannelId != -1)
+                    if (guild.rollChannelId != event.getChannel().getIdLong())// настройка есть, но канал не тот
+                        if (!msg.equals("/bind")) return;
+
+                // помощь
+                if (msg.equals("/help")) event.getChannel().sendMessage(serverHelpUTF8Message).queue();
+
+                // статистика
+                if (msg.equals("/stat")) {
+                    // выводим статистику единиц и двадцаток
+                    ArrayList<PlayerData> playersData = guild.playersCurrentData;
+                    if (playersData.size() == 0) {
+                        event.getChannel().sendMessage(getUTF_8(
+                                "За все время работы бота в этой гильдии, пока никто не выкинул ни одной единицы или двадцатки"
+                        )).queue();
+                    } else {
+                        // формиируем статистику
+                        StringBuilder stat = new StringBuilder("Статистика для тех, кто онлайн:\nЗа эту игру:\n ======== Единицы: ======== \n");
+                        for (PlayerData playersDatum : playersData) {
+                            if (playersDatum.numberOfOnes > 0) {
+
+                                // получаем имя игрока
+                                if (event.getGuild().getMemberById(playersDatum.playerId) != null)
+                                    stat.append(getUNICODE((Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId))).getEffectiveName()))
+                                            .append(" - ").append(playersDatum.numberOfOnes).append('\n');
+                            }
+                        }
+                        stat.append("\n ======== Двадцатки: ======== \n");
+                        for (PlayerData playersDatum : playersData) {
+                            if (playersDatum.numberOfTwenties > 0) {
+                                // получаем имя игрока
+                                if (event.getGuild().getMemberById(playersDatum.playerId) != null)
+                                    stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                                            .append(" - ").append(playersDatum.numberOfTwenties).append('\n');
+                            }
+                        }
+
+
+                        stat.append("\n\n\nЗа все время:\n ======== Единицы: ======== \n");
+                        for (PlayerData playersDatum : playersData) {
+                            if (playersDatum.allNumberOfOnes > 0) {
+                                // получаем имя игрока
+                                if (event.getGuild().getMemberById(playersDatum.playerId) != null)
+                                    stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                                            .append(" - ").append(playersDatum.allNumberOfOnes).append('\n');
+                            }
+                        }
+                        stat.append("\n ======== Двадцатки: ======== \n");
+                        for (PlayerData playersDatum : playersData) {
+                            if (playersDatum.allNumberOfTwenties > 0) {
+                                // получаем имя игрока
+                                if (event.getGuild().getMemberById(playersDatum.playerId) != null)
+                                    stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                                            .append(" - ").append(playersDatum.allNumberOfTwenties).append('\n');
+                            }
+                        }
+
+                        // отправляем сообщение
+                        event.getChannel().sendMessage(getUTF_8(stat.toString())).queue();
+                    }
                 }
+
+                // смена кидальни
+                if (msg.equals("/bind")) {
+                    // устанавливаем канал для работы бота на этом сервере
+                    setRollChannel(guild, event.getChannel().getIdLong());
+                    // говорим об этом пользователю
+                    event.getChannel().sendMessage(getUTF_8("С этого момента кости кидаются только тут")).queue();
+                }
+
+                // отладочный
+                if (msg.equals("/inf")) {
+                    StringBuilder answer = new StringBuilder("Сервер: ")
+                            .append(getUNICODE(event.getGuild().getName()))
+                            .append(" (")
+                            .append(event.getGuild().getIdLong())
+                            .append(")\nУчастники онлайн:");
+
+                    List<Member> members = event.getGuild().getMembers();
+                    for (Member member : members) {
+                        answer.append("\n\t ")
+                                .append(getUNICODE(member.getEffectiveName()))
+                                .append(" (")
+                                .append(member.getIdLong())
+                                .append(')');
+                    }
+                    event.getChannel().sendMessage(getUTF_8(answer.toString())).queue();
+                }
+            }
         }
 
-        // отфильтровываем сообщения от самого бота и пустые сообщения
-        if (event.getAuthor().isBot() || event.getMessage().getContentDisplay().length() == 0) {
-            return;
-        }
-
-//todo сделать получение гильдии только в одном месте? getGuildFromListById
-        // =========================================== команда для бота (для всех чатов) ===========================================
+        // ================================== команда бота для всех чатов ==================================
         if (msg.charAt(0) == '/') {
-
-            // ------------------------------------------ кинуть кость ------------------------------------------
+            // кинуть кость
             if (msg.charAt(1) == 'd' || msg.charAt(1) == 'D' // && msg.charAt(2) >= '0' && msg.charAt(2) <= '9'
             ) {
                 // проверка на валидные значения
                 try {
                     // кидаем кости и выводим сообщение
-                    int n = Integer.parseInt(msg.substring(2));
-                    int answer = roll(n);
-                    event.getChannel().sendMessage(getUTF_8("Rolled by " + getAuthorName(event) + ": d" + n + "= " + answer + "\n" + getTextInt(answer))).queue();
+                    RollAnswer answer = getRollAnswer(msg.substring(1));
+
+                    event.getChannel().sendMessage(getUTF_8(
+                            "Rolled by " + getAuthorName(event) + ": " + answer.expression + " = " +
+                                    answer.number + "\n" + getTextInt(answer.number))).queue();
 
                     // реакция бота и счетчик
-                    if (n == 20) {
-                        if (answer == 1)
-                            addCounterAndReaction(event, 1, 0);
-                        if (answer == 20)
-                            addCounterAndReaction(event, 0, 1);
-                    }
+                    addCounterAndReaction(event, answer.numberOfOnes, answer.numberOfTwenties);
 
                 } catch (java.lang.NumberFormatException e) {
-                    event.getChannel().sendMessage(getUTF_8("Вы ввели некорректное число для броска! Читайте /help ")).queue();
+                    event.getChannel().sendMessage(inputErrorMessage).queue();
                 }
             }
 
-            // ------------------------------------------ кинуть выражение ------------------------------------------
+            // кинуть выражение
             if (msg.charAt(1) == 'r' || msg.charAt(1) == 'R' // && msg.charAt(2) >= '0' && msg.charAt(2) <= '9'
             ) {
                 // проверка на валидные значения
@@ -238,96 +355,18 @@ public class RollBot extends ListenerAdapter {
                     RollAnswer answer = getRollAnswer(msg.substring(2));
 
                     event.getChannel().sendMessage(getUTF_8(
-                            "Rolled by " + getAuthorName(event) + ":" + answer.expression + "  =  " + answer.number + "\n" + getTextInt(answer.number)
-                    )).queue();
+                            "Rolled by " + getAuthorName(event) + ":" + answer.expression + "  =  " +
+                                    answer.number + "\n" + getTextInt(answer.number))).queue();
 
                     // реакция бота и счетчик
                     addCounterAndReaction(event, answer.numberOfOnes, answer.numberOfTwenties);
 
                 } catch (java.lang.NumberFormatException e) {
-                    event.getChannel().sendMessage(getUTF_8("Вы ввели некорректное выражение для броска! Читайте /help ")).queue();
+                    event.getChannel().sendMessage(inputErrorMessage).queue();
                 }
             }
 
-            // ------------------------------------------ статистика ------------------------------------------
-            if (msg.equals("/stat") && !event.isFromType(ChannelType.PRIVATE)) {
-                // выводим статистику единиц и двадцаток
-                ArrayList<PlayerData> playersData = getGuildFromListById(event.getGuild().getIdLong()).playersCurrentData;
-                if (playersData.size() == 0) {
-                    event.getChannel().sendMessage(getUTF_8(
-                            "За все время работы бота в этой гильдии, пока никто не выкинул ни одной единицы или двадцатки"
-                    )).queue();
-                } else {
-                    // формиируем статистику
-                    StringBuilder stat = new StringBuilder("Статистика для тех, кто онлайн:\nЗа эту игру:\n ======== Единицы: ======== \n");
-                    for (PlayerData playersDatum : playersData) {
-                        if (playersDatum.numberOfOnes > 0) {
-
-                            // получаем имя игрока
-                            if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                                stat.append(getUNICODE((Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId))).getEffectiveName()))
-                                        .append(" - ").append(playersDatum.numberOfOnes).append('\n');
-                        }
-                    }
-                    stat.append("\n ======== Двадцатки: ======== \n");
-                    for (PlayerData playersDatum : playersData) {
-                        if (playersDatum.numberOfTwenties > 0) {
-                            // получаем имя игрока
-                            if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                                stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
-                                        .append(" - ").append(playersDatum.numberOfTwenties).append('\n');
-                        }
-                    }
-
-
-                    stat.append("\n\n\nЗа все время:\n ======== Единицы: ======== \n");
-                    for (PlayerData playersDatum : playersData) {
-                        if (playersDatum.allNumberOfOnes > 0) {
-                            // получаем имя игрока
-                            if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                                stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
-                                        .append(" - ").append(playersDatum.allNumberOfOnes).append('\n');
-                        }
-                    }
-                    stat.append("\n ======== Двадцатки: ======== \n");
-                    for (PlayerData playersDatum : playersData) {
-                        if (playersDatum.allNumberOfTwenties > 0) {
-                            // получаем имя игрока
-                            if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                                stat.append(getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
-                                        .append(" - ").append(playersDatum.allNumberOfTwenties).append('\n');
-                        }
-                    }
-
-                    // отправляем сообщение
-                    event.getChannel().sendMessage(getUTF_8(stat.toString())).queue();
-                }
-            }
-
-            // ------------------------------------------ помощь ------------------------------------------
-            if (msg.equals("/help")) {
-                event.getChannel().sendMessage(getUTF_8("Привет, я " + TAG +
-                        "\n Вот список доступных команд:" +
-                        "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
-                        "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
-                        "\n\t\t\t(Поддерживаются + * / - dN KdN. Скобки пока не поддерживаются!);" +
-                        "\n\t\t/stat - количество двадцаток и единиц за текущую игру;" +
-                        "\n\t\t/help - показ этого сообщения;" +
-                        "\n\t\t/bind - назначить канал для костей, писать в нужном канале;" +
-                        "\n\t\t/exit - завершение работы бота;"
-                )).queue();
-            }
-
-            // ---------------------------------------- смена кидальни ----------------------------------------
-            if (msg.equals("/bind")) {
-                // устанавливаем канал для работы бота на этом сервере
-                GuildData guild = getGuildFromListById(event.getGuild().getIdLong());
-                setRollChannel(guild, event.getChannel().getIdLong());
-                // говорим об этом пользователю
-                event.getChannel().sendMessage(getUTF_8("С этого момента кости кидаются только тут")).queue();
-            }
-
-            // ------------------------------------------ команда выхода ------------------------------------------
+            // команда выхода
             if (msg.equals("/exit")) {
                 // выводим время работы бота
                 long millis = (System.currentTimeMillis() - startTimeMillis) % 1000;
@@ -339,7 +378,7 @@ public class RollBot extends ListenerAdapter {
                 event.getChannel().sendMessage(getUTF_8(
                         "Bye, bye " + getAuthorName(event)
                                 + ".. Working time: "
-                                + String.format("%02d:%02d:%02d.%d", hour, minute, second, millis)
+                                + String.format("%02d:%02d:(%02d.%d)", hour, minute, second, millis)
                 )).queue();
 
                 // спим 2 секунды
@@ -361,27 +400,7 @@ public class RollBot extends ListenerAdapter {
 
                 System.exit(0);
             }
-
-            // ------------------------------------------ отладочный  ------------------------------------------
-            if (msg.equals("/inf") && !event.isFromType(ChannelType.PRIVATE)) {
-                StringBuilder answer = new StringBuilder("Сервер: ")
-                        .append(getUNICODE(event.getGuild().getName()))
-                        .append(" (")
-                        .append(event.getGuild().getIdLong())
-                        .append(")\nУчастники онлайн:");
-
-                List<Member> members = event.getGuild().getMembers();
-                for (Member member : members) {
-                    answer.append("\n\t ")
-                            .append(getUNICODE(member.getEffectiveName()))
-                            .append(" (")
-                            .append(member.getIdLong())
-                            .append(')');
-                }
-                event.getChannel().sendMessage(getUTF_8(answer.toString())).queue();
-            }
         }
-
     }
 
     // =========================================== кости ===========================================
@@ -454,14 +473,14 @@ public class RollBot extends ListenerAdapter {
 
         } else if (rollS.contains("*") || rollS.contains("/")) {// разбиваем выражение на множители и передаем дальше
 
-
-            // пробегаемся по строке
+            // создаем ответ
             RollAnswer answer = new RollAnswer();
-            answer.expression.append("( ");
             answer.number = 1;
+
+            // пробегаемся по строке ища знаки или конец строки
+            answer.expression.append("( ");
             int previousPoz = -1;
             for (int i = 1; i < rollS.length(); i++) {
-
                 if (rollS.charAt(i) == '*' || rollS.charAt(i) == '/' || i == rollS.length() - 1) {
                     // считаем отдельную часть
                     RollAnswer ans;
@@ -495,53 +514,51 @@ public class RollBot extends ListenerAdapter {
             // возвращаем полученный результат
             return answer;
 
-        } else {// если это простое число или кость
+        } else {// если это простое число или любая кость
 
             // разбиваем строку на коэффициенты кости
             String[] expressions = rollS.split("[dD]");
 
-            if (expressions.length > 2 || expressions.length == 0) {// если там несколько r
-                throw new java.lang.NumberFormatException();
+            if (expressions.length == 1) {// обычное число без d (не кость)
+                return new RollAnswer(Integer.parseInt(rollS), new StringBuilder().append(Integer.parseInt(rollS)));
 
-            } else if (expressions.length == 2) {// бросаем кость несколько раз
+            } else if (expressions.length == 2) {// это кость
 
+                // количество граней на кости
+                int n = Integer.parseInt(expressions[1].trim());
+                // есть ли коэффициэнт перед костью
                 if (expressions[0].length() == 0) {// бросаем простую кость
-                    int n = Integer.parseInt(expressions[1]);
                     int roll = roll(n);
                     RollAnswer answer = new RollAnswer(roll, new StringBuilder("<").append(roll).append(">"));
                     // на двадцатых костях считаем особые числа
                     if (n == 20 && roll == 1) answer.numberOfOnes++;
                     if (n == 20 && roll == 20) answer.numberOfTwenties++;
                     return answer;
-                }
 
-                // количество граней на кости
-                int n = Integer.parseInt(expressions[1].trim());
-                // количество костей
-                int times = Integer.parseInt(expressions[0].trim());
+                } else {// бросаем кость несколько раз
 
-                // кидаем кости и считаем результат
-                RollAnswer answer = new RollAnswer();
-                answer.expression.append("(");
-                for (int i = 0; i < times; i++) {
-                    int roll = roll(n);
-                    // на двадцатых костях считаем особые числа
-                    if (n == 20 && roll == 1) answer.numberOfOnes++;
-                    if (n == 20 && roll == 20) answer.numberOfTwenties++;
-                    answer.expression.append(" <").append(roll);
-                    if (i == times - 1) {
-                        answer.expression.append("> )");
-                    } else {
-                        answer.expression.append("> +");
+                    // количество костей
+                    int times = Integer.parseInt(expressions[0].trim());
+                    // кидаем кости и считаем результат
+                    RollAnswer answer = new RollAnswer();
+                    answer.expression.append("(");
+                    for (int i = 0; i < times; i++) {
+                        // кидаем одну из костей
+                        int roll = roll(n);
+                        // добавляем все в красивую строку
+                        answer.expression.append(" <").append(roll).append("> ");
+                        if (i != times - 1) answer.expression.append('+');
+                        // добавляем то что выпало
+                        answer.number += roll;
+                        // если кидали 20ку и выпали особые добавляем их к счетчику в ответе
+                        if (n == 20 && roll == 1) answer.numberOfOnes++;
+                        if (n == 20 && roll == 20) answer.numberOfTwenties++;
                     }
-                    answer.number += roll;
+                    answer.expression.append(")");
+                    return answer;
                 }
-
-                return answer;
-
-            } else {// обычное число
-                return new RollAnswer(Integer.parseInt(rollS), new StringBuilder().append(Integer.parseInt(rollS)));
-            }
+            } else // если там несколько r или вообще пусто
+                throw new java.lang.NumberFormatException();
 
         }
     }
@@ -612,7 +629,7 @@ public class RollBot extends ListenerAdapter {
         return new String(utf8String.getBytes(UTF_8));
     }
 
-    String getUTF_8(String unicodeString) {
+    static String getUTF_8(String unicodeString) {
         // строку Unicode в байт массив, а затем байт массив в utf-8
         return new String(unicodeString.getBytes(), UTF_8);
     }
@@ -817,6 +834,7 @@ public class RollBot extends ListenerAdapter {
 
     }
 
+    // todo сохранять данные в сообщении мне
     // получаем json структуру из файла сервера, если структуры нет, создаем пустую json (без сохранения в файл)
     JsonObject getGuildJsonDataFromFileById(long guildId) throws IOException {
 
