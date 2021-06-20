@@ -10,10 +10,15 @@ sourceCompatibility = 1.8
 repositories {
     mavenCentral()
     jcenter()
+    maven {// репозиторий discord
+        name 'm2-dv8tion'
+        url 'https://m2.dv8tion.net/releases'
+    }
 }
 
 dependencies {
+    implementation("net.dv8tion:JDA:4.3.0_277")// библиотека discord
     testCompile group: 'junit', name: 'junit', version: '4.12'
-    compile'net.dv8tion:JDA:4.1.1_115' // библиотека discord
+    //compile'net.dv8tion:JDA:4.1.1_115' // библиотека discord
     implementation 'com.google.code.gson:gson:2.8.6' // библиотека GSON
 }
