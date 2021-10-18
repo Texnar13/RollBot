@@ -18,36 +18,30 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Random;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class RollBot extends ListenerAdapter {
     // тег бота
-    public static final String TAG = "RollBot";
+    public static final String TAG = "RollBot";// todo стоит ограничение в 2000 символов, надо проверять и разбивать вывод на сообщения \о/
 
     // рандомайзер
     Random randomizer = new Random(System.currentTimeMillis());
-    // врремя запуска бота
+    // время запуска бота
     static long startTimeMillis;
 
     // массив гильдий, в которых состоит бот
     static GuildData[] guilds;
     int currentGuildNumber;
-    int currentPlayerNumber;//cheatPlayerList
-
 
     // читы
     int deadMasterDice = -1;
     int victoryMasterDice = -1;
+    // читы привязываются к игроку, но не к серверу, тк передаются через личный чат
     List<PersonalCheatPoint> cheatPlayerList = new ArrayList<>();
 
-    // /mydmd 3 плохая
-    // /myvmd 3 хорошая
 
-
-    // метод запуска бота  RollBot#0469
+    // метод запуска бота RollBot#0469
     public static void main(String[] args) {
         // builder аккаунта бота
         JDABuilder builder = JDABuilder.createDefault(TokenClass.BOT_TOKEN);
@@ -85,9 +79,6 @@ public class RollBot extends ListenerAdapter {
             // загружаем данные оп одной гильдии(серверу)
             guilds[i] = getGuildDataFromFileByGuildId(temp.get(i).getIdLong());
         }
-
-        //newGetRollAnswer("(5+(5+5))");
-
     }
 
     // метод отрабатывающий при получении сообщения
@@ -117,58 +108,60 @@ public class RollBot extends ListenerAdapter {
         }
 
         // отфильтровываем сообщения от самого бота и пустые сообщения
-        if (event.getAuthor().isBot() || msg.length() == 0 || msg.charAt(0) != '/') return;
+        if (event.getAuthor().isBot()) return;
+        if (msg.length() <= 2) return;
+        if (msg.charAt(0) != '/' && msg.charAt(0) != '.') return;
 
-        //todo сделать получение гильдии только в одном месте? getGuildFromListById
+        // todo сделать случайные приветствия!
+        // todo сделать получение гильдии только в одном месте? getGuildFromListById
         if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
             // номер текущей гильдии
             currentGuildNumber = -1;
-            privateChatCommand(event, msg);
+            privateChatCommand(event, msg.substring(1));
         } else {// сообщение с сервера
             // номер текущей гильдии
             currentGuildNumber = getGuildNumberFromListById(event.getGuild().getIdLong());// todo проверка -1
             // обрабатываем
-            serverChatCommand(event, msg);
+            serverChatCommand(event, msg.substring(1));
         }
     }
 
     // команды в личном чате
     private void privateChatCommand(MessageReceivedEvent event, String msg) {
-        if (msg.startsWith("/fun ")) {
+        if (msg.startsWith("fun ")) {
             // можно писать в каналы веселые сообщения
             funCommand(event, msg);
             return;
         }
-        if (msg.equals("/help")) {
+        if (msg.equals("help")) {
             // помощь
             event.getChannel().sendMessage(StringConstants.helpUTF8Message).queue();
             return;
         }
 
         try {// sendMessageInEventChannel(event, "Отключено!");
-            if (msg.startsWith("/dmd")) {
+            if (msg.startsWith("dmd")) {
                 // чит плохого
-                deadMasterDice = Integer.parseInt(msg.substring(4).trim());
+                deadMasterDice = Integer.parseInt(msg.substring(3).trim());
                 sendMessageInEventChannel(event, "Везде не больше " + deadMasterDice + "...");
                 return;
             }
-            if (msg.startsWith("/vmd")) {// чит хорошего
-                victoryMasterDice = Integer.parseInt(msg.substring(4).trim());
-                sendMessageInEventChannel(event, "Везде не неменьше " + victoryMasterDice + "...");
+            if (msg.startsWith("vmd")) {// чит хорошего
+                victoryMasterDice = Integer.parseInt(msg.substring(3).trim());
+                sendMessageInEventChannel(event, "Везде не меньше " + victoryMasterDice + "...");
                 return;
             }
-            if (msg.startsWith("/mydmd")) {
+            if (msg.startsWith("mydmd")) {
                 // чит персональный плохого
-                int dmdCount = Integer.parseInt(msg.substring(6).trim());
+                int dmdCount = Integer.parseInt(msg.substring(5).trim());
                 long playerId = event.getAuthor().getIdLong();
 
-                int playerPoz = getCheatPlayerPozById(playerId);
+                PersonalCheatPoint point = getCheatPlayerById(playerId);
 
-                if (playerPoz == -1) {
-                    PersonalCheatPoint point = new PersonalCheatPoint(playerId, dmdCount, -1);
+                if (point == null) {
+                    point = new PersonalCheatPoint(playerId, dmdCount, -1);
                     cheatPlayerList.add(point);
                 } else {
-                    PersonalCheatPoint point = cheatPlayerList.get(playerPoz);
                     point.dmd = dmdCount;
                 }
 
@@ -177,25 +170,21 @@ public class RollBot extends ListenerAdapter {
                 );
                 return;
             }
-            if (msg.startsWith("/myvmd")) {
+            if (msg.startsWith("myvmd")) {
                 // чит персональный хорошего
-                int vmdCount = Integer.parseInt(msg.substring(6).trim());
+                int vmdCount = Integer.parseInt(msg.substring(5).trim());
                 long playerId = event.getAuthor().getIdLong();
 
-                int playerPoz = getCheatPlayerPozById(playerId);
-                System.out.println("////myvmd poz = " + playerPoz + " id = " + playerId);
+                PersonalCheatPoint point = getCheatPlayerById(playerId);
 
-                if (playerPoz == -1) {
-                    PersonalCheatPoint point = new PersonalCheatPoint(playerId, -1, vmdCount);
+                if (point == null) {
+                    point = new PersonalCheatPoint(playerId, -1, vmdCount);
                     cheatPlayerList.add(point);
                 } else {
-                    PersonalCheatPoint point = cheatPlayerList.get(playerPoz);
                     point.vmd = vmdCount;
                 }
 
-                sendMessageInEventChannel(event,
-                        "Теперь у тебя не меньше " + vmdCount + "..."
-                );
+                sendMessageInEventChannel(event, "Теперь у тебя не меньше " + vmdCount + "...");
                 return;
             }
         } catch (NumberFormatException e) {
@@ -203,18 +192,15 @@ public class RollBot extends ListenerAdapter {
             sendMessageInEventChannel(event, "Ошибка числа!");
         }
 
-        if (msg.startsWith("/myclear")) {
+        if (msg.startsWith("myclear")) {
             // отключаем собственный чит
-
-            int playerPoz = getCheatPlayerPozById(event.getAuthor().getIdLong());
-            if (playerPoz != -1) cheatPlayerList.remove(playerPoz);
-
+            cheatPlayerList.remove(getCheatPlayerById(event.getAuthor().getIdLong()));
             sendMessageInEventChannel(event, "my отключен ...");
 
             return;
         }
 
-        if (msg.trim().equals("/cheatinfo")) {
+        if (msg.trim().equals("cheatinfo")) {
             // монитор читов
             StringBuilder str = new StringBuilder("dmd= ")
                     .append(((deadMasterDice < 0) ? ("Выключен") : (deadMasterDice)))
@@ -239,15 +225,18 @@ public class RollBot extends ListenerAdapter {
             return;
         }// todo получать имена игроков
 
-        if (msg.charAt(1) == 'd' || msg.charAt(1) == 'D') {
-            // кинуть кость
-            rollCommand(event, msg.substring(1));
-        } else if (msg.charAt(1) == 'r' || msg.charAt(1) == 'R') {
-            // кинуть выражение
-            rollCommand(event, msg.substring(2));
-        } else if (msg.equals("/exit")) {
+        if (msg.equals("exit")) {
             // команда выхода
             exitCommand(event);
+        }
+
+        msg = clearRollFromFuckingRussianLetters(msg);
+        if (msg.charAt(0) == 'd' || msg.charAt(0) == 'D') {
+            // кинуть кость
+            rollCommand(event, msg);
+        } else if (msg.charAt(0) == 'r' || msg.charAt(0) == 'R') {
+            // кинуть выражение
+            rollCommand(event, msg.substring(1));
         }
     }
 
@@ -257,39 +246,38 @@ public class RollBot extends ListenerAdapter {
         // отфильтровываем сообщения только в нужном канале (если такая настройка стоит)
         if (guilds[currentGuildNumber].rollChannelId != -1)
             if (guilds[currentGuildNumber].rollChannelId != event.getChannel().getIdLong())// настройка есть, но канал не тот
-                if (!msg.equals("/bind"))
+                if (!msg.equals("bind"))
                     return;
 
         switch (msg) {
-            case "/help":// помощь
+            case "help":// помощь
                 event.getChannel().sendMessage(StringConstants.serverHelpUTF8Message).queue();
                 break;
 
-            case "/stat":// статистика
+            case "stat":// статистика
                 statisticsCommand(event, guilds[currentGuildNumber]);
                 break;
 
-            case "/bind":// смена кидальни
+            case "bind":// смена кидальни
                 // устанавливаем канал для работы бота на этом сервере
                 setRollChannel(guilds[currentGuildNumber], event.getChannel().getIdLong());
                 // говорим об этом пользователю
                 sendMessageInEventChannel(event, "С этого момента кости кидаются только тут");
                 break;
 
-            case "/debug":// отладочный
+            case "debug":// отладочный
                 debugCommand(event);
                 break;
 
-            case "/exit": // команда выхода
+            case "exit": // команда выхода
                 exitCommand(event);
                 break;
 
-
             // назначение главной кости
             default: {
-                if (msg.startsWith("/md")) {
+                if (msg.startsWith("md")) {
                     try {
-                        guilds[currentGuildNumber].masterDice = Integer.parseInt(msg.substring(3).trim());
+                        guilds[currentGuildNumber].masterDice = Integer.parseInt(msg.substring(2).trim());
 
                         // сохраняем в файл
                         try {
@@ -313,20 +301,77 @@ public class RollBot extends ListenerAdapter {
                     } catch (NumberFormatException e) {
                         sendMessageInEventChannel(event, "Ошибка числа!");
                     }
-                } else if (msg.charAt(1) == 'd' || msg.charAt(1) == 'D') {
+                }
+
+                msg = clearRollFromFuckingRussianLetters(msg);
+                if (msg.charAt(0) == 'd' || msg.charAt(0) == 'D') {
                     // кинуть кость
-                    rollCommand(event, msg.substring(1));
-                } else if (msg.charAt(1) == 'r' || msg.charAt(1) == 'R') {
+                    rollCommand(event, msg);
+                } else if (msg.charAt(0) == 'r' || msg.charAt(0) == 'R') {
                     // кинуть выражение
-                    rollCommand(event, msg.substring(2));
+                    rollCommand(event, msg.substring(1));
                 }
             }
         }
     }
 
-    // ========================================= комманды =========================================
+
+    private String clearRollFromFuckingRussianLetters(String rollString ){
+        //System.out.println(rollString);
+        //System.out.println(rollString.toLowerCase(new Locale("ru","RU")));// todo не работает
+
+
+//        StringBuilder builder = new StringBuilder(rollString);
+//        if(builder.charAt())
+//
+//        System.out.println("aaaa1:"+rollString.charAt(0)+rollString.charAt(1));
+//        System.out.println("aaaa2:"+builder.charAt(0));
+//        System.out.println("aaaa3:"+builder.toString().charAt(0));
+//        System.out.println("aaaa4:"+rollString.length());
+//
+//        System.out.println(".к3к:" + (new String(".к3к")).length());
+//
+
+        System.out.println(Arrays.toString((new String(".к3к")).getBytes(StandardCharsets.UTF_8)));
+
+        //builder.indexOf("k");
+
+        // меняем ошибки раскладки в выражении
+        if (rollString.startsWith("к"))
+            rollString = rollString.replaceFirst("к", "r");
+        rollString = rollString.replaceAll("в", "d");
+        rollString = rollString.replaceAll("В", "d");
+
+        // меняем русское обозначение
+        rollString = rollString.replaceAll("к", "d");
+        rollString = rollString.replaceAll("К", "d");
+        rollString = rollString.replaceAll("д", "d");
+        rollString = rollString.replaceAll("Д", "d");
+        rollString = rollString.replaceAll("р", "r");
+        rollString = rollString.replaceAll("Р", "r");
+
+        // заглавные буквы
+        rollString = rollString.replaceAll("R", "r");
+        rollString = rollString.replaceAll("D", "d");
+        return rollString;
+    }
+
+    // ========================================= команды =========================================
 
     void statisticsCommand(MessageReceivedEvent event, GuildData guild) {
+
+        // выводим время работы бота
+        long millis = (System.currentTimeMillis() - startTimeMillis) % 1000;
+        long second = ((System.currentTimeMillis() - startTimeMillis) / 1000) % 60;
+        long minute = ((System.currentTimeMillis() - startTimeMillis) / (1000 * 60)) % 60;
+        long hour = ((System.currentTimeMillis() - startTimeMillis) / (1000 * 60 * 60)) % 24;
+
+        // прощаемся
+        sendMessageInEventChannel(event,
+                "Время работы: "
+                        + String.format("%02dh %02dm %02d.%ds", hour, minute, second, millis)
+        );
+
         // выводим статистику единиц и двадцаток
         ArrayList<PlayerData> playersData = guild.playersCurrentData;
         if (playersData.size() == 0) {
@@ -400,11 +445,15 @@ public class RollBot extends ListenerAdapter {
 
     void funCommand(MessageReceivedEvent event, String msg) {
         try {
+            System.out.println(msg.substring(4, 22));
+            System.out.println(msg.substring(23, 41));
+            System.out.println(msg.substring(41));
+
             Objects.requireNonNull(
                     Objects.requireNonNull(
-                            event.getJDA().getGuildById(Long.parseLong(msg.substring(5, 23)))
-                    ).getTextChannelById(Long.parseLong(msg.substring(24, 42)))
-            ).sendMessage(StringConstants.getUTF_8(msg.substring(42))).queue();
+                            event.getJDA().getGuildById(Long.parseLong(msg.substring(4, 22)))
+                    ).getTextChannelById(Long.parseLong(msg.substring(23, 41)))
+            ).sendMessage(StringConstants.getUTF_8(msg.substring(41))).queue();
         } catch (NullPointerException e) {
             sendMessageInEventChannel(event, "no such guild/channel error");
         } catch (java.lang.NumberFormatException e) {
@@ -417,72 +466,77 @@ public class RollBot extends ListenerAdapter {
     }
 
     void rollCommand(MessageReceivedEvent event, String command) {
-        // проверка на валидные значения
-        try {
 
-            int mainDice = 20;
-            if (currentGuildNumber != -1) {
-                mainDice = guilds[currentGuildNumber].masterDice;
-            }
+        Parser.RollAnswer answer;
+        if (currentGuildNumber != -1) {
+            // подгружаем главную кость
+            int mainDice = guilds[currentGuildNumber].masterDice;
 
             // подгрузка читов
             int lowerThreshold = 1;
             int upperThreshold = mainDice;
 
             // проверяем на наличие глобальных
-            if(1 <= victoryMasterDice && victoryMasterDice <= mainDice){
+            if (1 <= victoryMasterDice && victoryMasterDice <= mainDice) {
                 lowerThreshold = victoryMasterDice;
             }
-            if(1 <= deadMasterDice && deadMasterDice <= mainDice){
+            if (1 <= deadMasterDice && deadMasterDice <= mainDice) {
                 upperThreshold = deadMasterDice;
             }
-            // проверяем на наличие локальных читов
-            if (currentGuildNumber != -1) {
-                int poz = getCheatPlayerPozById(
-                        guilds[currentGuildNumber].playersCurrentData.get(currentPlayerNumber).playerId);
-                if (poz != -1) {
-                    PersonalCheatPoint point = cheatPlayerList.get(poz);
-                    if(1 <= point.vmd && point.vmd <= mainDice){
-                        lowerThreshold = point.vmd;
-                    }
-                    if(1 <= point.dmd && point.dmd <= mainDice){
-                        upperThreshold = point.dmd;
-                    }
+            // проверяем на наличие персональных читов
+            PersonalCheatPoint point = getCheatPlayerById(event.getAuthor().getIdLong());
+            if (point != null) {
+                if (1 <= point.vmd && point.vmd <= mainDice) {
+                    lowerThreshold = point.vmd;
+                }
+                if (1 <= point.dmd && point.dmd <= mainDice) {
+                    upperThreshold = point.dmd;
                 }
             }
 
-            Parser.RollAnswer answer = Parser.parseRollString(
+            // парсим
+            answer = Parser.parseRollString(
                     command,
                     mainDice,
                     randomizer,
                     lowerThreshold,
                     upperThreshold
             );
-
-            switch (answer.errorPoz){
-                case -1:// без ошибок
-                    sendMessageInEventChannel(event,
-                            "Rolled by " + getAuthorName(event) + ":" + answer.expression + "  =  " +
-                                    answer.number + "\n" + getTextInt(answer.number)
-                    );
-                    break;
-                case -2:// в расчетах был деление на 0
-                    sendMessageInEventChannel(event,
-                            "В общем в расчетах получилось деление на 0, а я так не умею. \nНо ты можешь попробовать еще раз :)"
-                    );
-                    break;
-                default:// ошибки
-                    sendMessageInEventChannel(event,
-                            "/r " + command.replaceAll(" ", "").substring(0, answer.errorPoz) + "<= Здесь ошибка"
-                    );
-            }
-
-            // реакция бота и счетчик
-            addCounterAndReaction(event, answer.numberOfOnes, answer.numberOfTwenties);
-
-        } catch (java.lang.NumberFormatException e) {
-            event.getChannel().sendMessage(StringConstants.inputErrorMessage).queue();
+        } else {
+            // парсим
+            answer = Parser.parseRollString(
+                    command,
+                    200,
+                    randomizer,
+                    1,
+                    200
+            );
         }
+
+        // выводим итоги
+        switch (answer.errorPoz) {
+            case -1:// без ошибок
+                sendMessageInEventChannel(event,
+                        "Rolled by " + getAuthorName(event) + ": " + answer.expression + "  =  " +
+                                answer.number + "\n" + StringConstants.getBigTextInt(answer.number)
+                );
+                break;
+            case -2:// в расчетах был деление на 0
+                sendMessageInEventChannel(event,
+                        "В общем в расчетах получилось деление на 0, а я так не умею. \nНо ты можешь попробовать еще раз :)"
+                );
+                break;
+            case -3:// арифметическая ошибка
+                sendMessageInEventChannel(event, "какая-то арифметическая ошибка, Ваня срочно смотри логи..");
+                break;
+            default:// ошибки
+                sendMessageInEventChannel(event,
+                        "/r " + command.replaceAll(" ", "").substring(0, answer.errorPoz) + "<= Здесь ошибка"
+                );
+        }
+
+        // реакция бота и счетчик
+        addReactionAndCounter(event, answer.numberOfOnes, answer.numberOfTwenties);
     }
 
     void exitCommand(MessageReceivedEvent event) {
@@ -513,8 +567,9 @@ public class RollBot extends ListenerAdapter {
 
     // =========================================== кости ===========================================
 
-    void addCounterAndReaction(MessageReceivedEvent event, int numberOfOnes, int numberOfTwenties) {
-        // для d20
+    void addReactionAndCounter(MessageReceivedEvent event, int numberOfOnes, int numberOfTwenties) {
+
+        // реакция бота и счетчик
         if (numberOfOnes > 0 || numberOfTwenties > 0) {
 
             // реакция бота
@@ -524,95 +579,55 @@ public class RollBot extends ListenerAdapter {
             if (numberOfTwenties > 0) {
                 event.getMessage().addReaction("\uD83C\uDF87").queue();
             }
-            // todo почему-то добавляет реакцию даже не на основную кость (кидалась 20, выпала 1, основная 24)
 
-            // находим игрока кинувшего кости
-            PlayerData currentPlayer = guilds[currentGuildNumber].getPlayerByEvent(event);
+            // игрокам в гильдии начисляем статистику
+            if (currentGuildNumber == -1) {
+                // находим игрока кинувшего кости
+                PlayerData currentPlayer = guilds[currentGuildNumber].getPlayerByEvent(event);
 
-            // создаем нового если он пуст
-            if (currentPlayer == null) {
-                // создаем нового игрока
-                currentPlayer = new PlayerData();
-                currentPlayer.playerId = event.getAuthor().getIdLong();
-                guilds[currentGuildNumber].playersCurrentData.add(currentPlayer);
-                Point save = getPlayerPointsFromFileById(event.getGuild().getIdLong(), event.getAuthor().getIdLong());// todo разобраться что делает этот метод и дать ему нормальное имя!
-                currentPlayer.allNumberOfOnes = save.numberOfOnes;
-                currentPlayer.allNumberOfTwenties = save.numberOfTwenties;
-            }
+                // ищем в файле если он пуст или создаем нового
+                if (currentPlayer == null) {
+                    // создаем нового игрока
+                    currentPlayer = new PlayerData();
+                    currentPlayer.playerId = event.getAuthor().getIdLong();
+                    guilds[currentGuildNumber].playersCurrentData.add(currentPlayer);
+                    Point save = getPlayerPointsFromFileByIdOrCreateNew(event.getGuild().getIdLong(), event.getAuthor().getIdLong());
+                    currentPlayer.allNumberOfOnes = save.numberOfOnes;
+                    currentPlayer.allNumberOfTwenties = save.numberOfTwenties;
+                }
 
-            // считаем количество раз по 20 единиц и двадцаток до изменения (делением нацело)
-            int twentyOnesCount = currentPlayer.allNumberOfOnes / 20;
-            int twentyTwentiesCount = currentPlayer.allNumberOfTwenties / 20;
+                // считаем количество раз по 20 единиц и двадцаток до изменения (делением нацело)
+                int twentyOnesCount = currentPlayer.allNumberOfOnes / 20;
+                int twentyTwentiesCount = currentPlayer.allNumberOfTwenties / 20;
 
 
-            // меняем данные игрока
-            currentPlayer.numberOfOnes += numberOfOnes;
-            currentPlayer.numberOfTwenties += numberOfTwenties;
-            currentPlayer.allNumberOfOnes += numberOfOnes;
-            currentPlayer.allNumberOfTwenties += numberOfTwenties;
-            // добавляем данные так же и в файле
-            addPointsInFileById(
-                    event.getGuild().getIdLong(),
-                    event.getAuthor().getIdLong(),
-                    numberOfOnes,
-                    numberOfTwenties
-            );
+                // меняем данные игрока
+                currentPlayer.numberOfOnes += numberOfOnes;
+                currentPlayer.numberOfTwenties += numberOfTwenties;
+                currentPlayer.allNumberOfOnes += numberOfOnes;
+                currentPlayer.allNumberOfTwenties += numberOfTwenties;
+                // добавляем данные так же и в файле
+                addPointsInFileById(
+                        event.getGuild().getIdLong(),
+                        event.getAuthor().getIdLong(),
+                        numberOfOnes,
+                        numberOfTwenties
+                );
 
-            // считаем количество раз по 20 единиц и двадцаток после изменения (делением нацело)
-            // для проверки на супер сообщение
-            if (currentPlayer.allNumberOfOnes / 20 > twentyOnesCount) {
-                sendMessageInEventChannel(event, " ======== Уфф, это твоя двадцатая единица!========");
-            }
-            if (currentPlayer.allNumberOfTwenties / 20 > twentyTwentiesCount) {
-                sendMessageInEventChannel(event, " ======== Ура, это твоя двадцатая " + guilds[currentGuildNumber].masterDice + "! ======== ");
+                // считаем количество раз по 20 единиц и двадцаток после изменения (делением нацело)
+                // для проверки на супер сообщение
+                if (currentPlayer.allNumberOfOnes / 20 > twentyOnesCount) {
+                    sendMessageInEventChannel(event, " ======== Уфф, это твоя двадцатая единица!========");
+                }
+                if (currentPlayer.allNumberOfTwenties / 20 > twentyTwentiesCount) {
+                    sendMessageInEventChannel(event, " ======== Ура, это твоя двадцатая " + guilds[currentGuildNumber].masterDice + "! ======== ");
+                }
             }
         }
-
     }
 
     // =================================== вспомогательные методы ===================================
 
-
-    StringBuilder getTextInt(int n) {
-        // создаем строку вывода
-        StringBuilder answer = new StringBuilder();
-        // выводим цифры
-        if (n != 0) {
-            // ставим отрицательный знак если он есть
-            boolean isNegative = false;
-            if (n < 0) {
-                isNegative = true;
-                n = -n;
-            }
-            // разбиваем число на цифры
-            int[] numbers = new int[String.valueOf(n).length()];
-            for (int i = 0; i < numbers.length; i++) {
-                numbers[i] = n % 10;
-                n /= 10;
-            }
-            // выводим пять строк
-            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
-                // выводим отрицательный знак, если он есть
-                if (isNegative) {
-                    answer.append(StringConstants.NUMBERS_CODES[10][linesIterator]).append("  ");
-                }
-                // выводим число наоборот
-                for (int numbersIterator = numbers.length - 1; numbersIterator >= 0; numbersIterator--) {
-                    answer.append(StringConstants.NUMBERS_CODES[numbers[numbersIterator]][linesIterator]).append("  ");
-                }
-                // завершаем строку
-                answer.append("\n");
-            }
-        } else {
-            // выводим пять строк нуля
-            for (int linesIterator = 0; linesIterator < 5; linesIterator++) {
-                answer.append(StringConstants.NUMBERS_CODES[0][linesIterator]).append("  ").append("\n");
-            }
-        }
-
-        // возвращаем результат
-        return answer;
-    }
 
     String getAuthorName(MessageReceivedEvent event) {
         if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
@@ -635,7 +650,7 @@ public class RollBot extends ListenerAdapter {
 
     // ========================================= хранилище =========================================
 
-    Point getPlayerPointsFromFileById(long guildId, long memberId) {
+    Point getPlayerPointsFromFileByIdOrCreateNew(long guildId, long memberId) {
         try {
             // получаем данные из файла в json
             JsonObject rootObject = getGuildJsonDataFromFileById(guildId);
@@ -723,9 +738,11 @@ public class RollBot extends ListenerAdapter {
         return guild;
     }
 
+    // назначить гильдии канал для костей
     void setRollChannel(GuildData guild, long channelId) {
         // назначаем
         guild.rollChannelId = channelId;
+
         // сохраняем в файл
         try {
             // получаем данные из файла в json
@@ -853,13 +870,23 @@ public class RollBot extends ListenerAdapter {
         writer.close();
     }
 
-    int getCheatPlayerPozById(long id) {
-        for (int i = 0; i < cheatPlayerList.size(); i++) {
-            if (cheatPlayerList.get(i).playerId == id) {
-                return i;
+    //    int getCheatPlayerPozById(long id) {
+//        for (int i = 0; i < cheatPlayerList.size(); i++) {
+//            if (cheatPlayerList.get(i).playerId == id) {
+//                return i;
+//            }
+//        }
+//        return -1;
+//    }
+    PersonalCheatPoint getCheatPlayerById(long id) {
+        Iterator<PersonalCheatPoint> iterator = cheatPlayerList.iterator();
+        while (iterator.hasNext()) {
+            PersonalCheatPoint point = iterator.next();
+            if (point.playerId == id) {
+                return point;
             }
         }
-        return -1;
+        return null;
     }
 
 

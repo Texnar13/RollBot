@@ -3,13 +3,13 @@ import java.util.Random;
 public class Parser {
 
     // отладка
-    private static String append;
+    //private static String append;
 
 
     public static RollAnswer parseRollString(
             String rollString, int mainDice, Random randomizer, int lowerThreshold, int upperThreshold
     ) {
-        append = "";
+        //append = "";
         // создаем ответ
         RollAnswer rollAnswer = new RollAnswer(
                 new StringBuilder(
@@ -30,6 +30,8 @@ public class Parser {
                 rollAnswer.errorPoz = 0;
                 e.printStackTrace();
             }
+        } catch (java.lang.NumberFormatException e) {
+            rollAnswer.errorPoz = -3;
         }
 
 
@@ -143,7 +145,7 @@ public class Parser {
             forResult.tempRollString.deleteCharAt(0);
             forResult.checkedCorrectLength++;
             forResult.expression.append('(');
-            append = append + ' ';//todo убрать
+            //append = append + ' ';
 
             // считаем выражение внутри скобок и суммируем это с основным выражением
             returnAnswer = sumCheck(forResult);
@@ -166,7 +168,7 @@ public class Parser {
                     forResult.checkedCorrectLength++;
                     forResult.expression.append(")");
 
-                    append = append.substring(0, append.length() - 1);//todo убрать
+                    //append = append.substring(0, append.length() - 1);
                 } else {
                     // если закрывающей скобки нет, это ошибка
                     forResult.errorPoz = forResult.checkedCorrectLength;
@@ -358,63 +360,8 @@ public class Parser {
     /*
      * todo ошибки
      *
-     *  /rd 0+  =>  Вы ввели некорректное выражение для броска! Читайте /help
-     *
-     *  /r 0+   => err = 0
-     * -----
-     * RollBot:[Private] Texnar13: /r 0+
-     * addCheck_s_ 0+
-     * multiplyCheck_s_ 0+
-     * bracketsCheck_0+
-     * d  =>+
-     * 2_+
-     * multiplyCheck_af_ + len=0 err=-1
-     * addCheck_af_ + len=0 err=-1
-     * multiplyCheck_s_
-     * bracketsCheck_
-     * 3_
-     * multiplyCheck_af_  len=0 err=0
-     * addCheck_as_  len=0 lent=0 err=-1 errt=0
-     * +++++++++++e=1
-     * -----
-     *
-     *
-     *
-     *
-     *
-     *
      *  /r--1
      *  Texnar13:-0-1  =  -1
-     *
-     *
-     *
-     * /r (d20+10
-     * вообще вылетает:
-     *
-     * addCheck_s_ (d20+10
-     * multiplyCheck_s_ (d20+10
-     * bracketsCheck_(d20+10
-     *  addCheck_s_ d20+10
-     *  multiplyCheck_s_ d20+10
-     *  bracketsCheck_d20+10
-     * rollCheck d20+10
-     * d => +10 r.number=3 m =false
-     *  2_+10
-     *  multiplyCheck_af_ +10 len=3 err=-1
-     *  addCheck_af_ +10 len=3 err=-1
-     *  multiplyCheck_s_ 10
-     *  bracketsCheck_10
-     * rollCheck 10
-     * d =>  r.number=10 m =false
-     *  2_
-     *  multiplyCheck_af_  len=2 err=-1
-     *  addCheck_as_  len=3 lent=2 err=-1 errt=-1
-     *  1_
-     *      java.lang.StringIndexOutOfBoundsException: String index out of range: 0
-     *        at java.lang.String.charAt(String.java:658)
-     *        at RollBot.bracketsCheck(RollBot.java:670)
-     *
-     *
      *
      * */
 

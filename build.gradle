@@ -20,5 +20,5 @@ dependencies {
     implementation("net.dv8tion:JDA:4.3.0_277")// библиотека discord
     testCompile group: 'junit', name: 'junit', version: '4.12'
     //compile'net.dv8tion:JDA:4.1.1_115' // библиотека discord
-    implementation 'com.google.code.gson:gson:2.8.6' // библиотека GSON
+    implementation 'com.google.code.gson:gson:2.8.8' // библиотека GSON
 }
