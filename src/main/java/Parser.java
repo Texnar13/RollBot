@@ -30,7 +30,7 @@ public class Parser {
                 rollAnswer.errorPoz = 0;
                 e.printStackTrace();
             }
-        } catch (java.lang.NumberFormatException e) {
+        } catch (NumberFormatException e) {
             rollAnswer.errorPoz = -3;
         }
 

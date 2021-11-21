@@ -1,8 +1,5 @@
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 public class StringConstants {
 
@@ -87,15 +84,15 @@ public class StringConstants {
             }
     };
 
-    static final String helpUTF8Message = getUTF_8("Привет, я " + RollBot.TAG +
+    static final String helpUTF8Message = "Привет, я " + RollBot.TAG +
             "\n Вот список доступных команд:" +
             "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
             "\n\t\t/r (2d2 * 2) + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
             "\n\t\t\t(Поддерживаются + * / - () dN KdN );" +
             "\n\t\t/help - показ этого сообщения;" +
-            "\n\t\t/exit - завершение работы бота;");
+            "\n\t\t/exit - завершение работы бота;";
 
-    static final String serverHelpUTF8Message = getUTF_8("Привет, я " + RollBot.TAG +
+    static final String serverHelpUTF8Message = "Привет, я " + RollBot.TAG +
             "\n Вот список доступных команд:" +
             "\n\t\t/dN (d10, d3, d100..) - кинуть кость и вывести получившееся значение (от 1 до N);" +
             "\n\t\t/r 2d2 * 2 + d2 - 5  - кинуть кости, посчитать выражение и вывести ответ" +
@@ -104,20 +101,12 @@ public class StringConstants {
             "\n\t\t/help - показ этого сообщения;" +
             "\n\t\t/bind - назначить канал для костей, писать в нужном канале;" +
             "\n\t\t/md 24 - назначить главную кость, по которой учитывается статистика;" +
-            "\n\t\t/exit - завершение работы бота;");
+            "\n\t\t/exit - завершение работы бота;";
 
-    static final String inputErrorMessage = getUTF_8("Вы ввели некорректное выражение для броска! Читайте /help");
+    static final String inputErrorMessage = "Вы ввели некорректное выражение для броска! Читайте /help";
 
 
-    public static String getUNICODE(String utf8String) {
-        // строку utf-8 в байт массив, а затем байт массив в Unicode
-        return new String(utf8String.getBytes(StandardCharsets.UTF_8));
-    }
 
-    public static String getUTF_8(String unicodeString) {
-        // строку Unicode в байт массив, а затем байт массив в utf-8
-        return new String(unicodeString.getBytes(), StandardCharsets.UTF_8);
-    }
 
     public static StringBuilder getBigTextInt(int n) {
         // создаем строку вывода

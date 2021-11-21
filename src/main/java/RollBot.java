@@ -18,12 +18,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class RollBot extends ListenerAdapter {
     // тег бота
-    public static final String TAG = "RollBot";// todo стоит ограничение в 2000 символов, надо проверять и разбивать вывод на сообщения \о/
+    public static final String TAG = "RollBot";
+    // todo сделать случайные приветствия!
+    // todo стоит ограничение в 2000 символов, надо проверять и разбивать вывод на сообщения \о/
 
     // рандомайзер
     Random randomizer = new Random(System.currentTimeMillis());
@@ -86,23 +87,23 @@ public class RollBot extends ListenerAdapter {
     public void onMessageReceived(MessageReceivedEvent event) {
 
         // получаем текст сообщения
-        String msg = StringConstants.getUNICODE(event.getMessage().getContentDisplay()).trim();
+        String msg = event.getMessage().getContentDisplay().trim();
 
         // выводим логи
         System.out.println("-----");// красивый разделитель
         if (event.isFromType(ChannelType.PRIVATE)) {
             // выводим сообщение в лог
             System.out.printf(TAG + ":[Private] %s: %s\n",
-                    StringConstants.getUNICODE(event.getAuthor().getName()),
+                    event.getAuthor().getName(),
                     msg
             );
         } else {
             System.out.printf(
                     TAG + ":[Server][%s][%s] %s(%s): %s\n",
-                    StringConstants.getUNICODE(event.getGuild().getName()), // гильдия (сервер)
-                    StringConstants.getUNICODE(event.getTextChannel().getName()), // канал
-                    StringConstants.getUNICODE(Objects.requireNonNull(event.getMember()).getEffectiveName()),// никнейм специфичный для данной гильдии написавшего
-                    StringConstants.getUNICODE(event.getAuthor().getName()), // имя написавшего
+                    event.getGuild().getName(), // гильдия (сервер)
+                    event.getTextChannel().getName(), // канал
+                    Objects.requireNonNull(event.getMember()).getEffectiveName(),// никнейм специфичный для данной гильдии написавшего
+                    event.getAuthor().getName(), // имя написавшего
                     msg // сообщение
             );
         }
@@ -112,7 +113,6 @@ public class RollBot extends ListenerAdapter {
         if (msg.length() <= 2) return;
         if (msg.charAt(0) != '/' && msg.charAt(0) != '.') return;
 
-        // todo сделать случайные приветствия!
         // todo сделать получение гильдии только в одном месте? getGuildFromListById
         if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
             // номер текущей гильдии
@@ -231,10 +231,10 @@ public class RollBot extends ListenerAdapter {
         }
 
         msg = clearRollFromFuckingRussianLetters(msg);
-        if (msg.charAt(0) == 'd' || msg.charAt(0) == 'D') {
+        if (msg.charAt(0) == 'd') {
             // кинуть кость
             rollCommand(event, msg);
-        } else if (msg.charAt(0) == 'r' || msg.charAt(0) == 'R') {
+        } else if (msg.charAt(0) == 'r') {
             // кинуть выражение
             rollCommand(event, msg.substring(1));
         }
@@ -250,31 +250,24 @@ public class RollBot extends ListenerAdapter {
                     return;
 
         switch (msg) {
-            case "help":// помощь
-                event.getChannel().sendMessage(StringConstants.serverHelpUTF8Message).queue();
-                break;
-
-            case "stat":// статистика
-                statisticsCommand(event, guilds[currentGuildNumber]);
-                break;
-
-            case "bind":// смена кидальни
+            case "help" ->// помощь
+                    event.getChannel().sendMessage(StringConstants.serverHelpUTF8Message).queue();
+            case "stat" ->// статистика
+                    statisticsCommand(event, guilds[currentGuildNumber]);
+            case "bind" -> {// смена кидальни
                 // устанавливаем канал для работы бота на этом сервере
                 setRollChannel(guilds[currentGuildNumber], event.getChannel().getIdLong());
                 // говорим об этом пользователю
                 sendMessageInEventChannel(event, "С этого момента кости кидаются только тут");
-                break;
+            }
+            case "debug" ->// отладочный
+                    debugCommand(event);
+            case "exit" -> // команда выхода
+                    exitCommand(event);
 
-            case "debug":// отладочный
-                debugCommand(event);
-                break;
-
-            case "exit": // команда выхода
-                exitCommand(event);
-                break;
 
             // назначение главной кости
-            default: {
+            default -> {
                 if (msg.startsWith("md")) {
                     try {
                         guilds[currentGuildNumber].masterDice = Integer.parseInt(msg.substring(2).trim());
@@ -304,10 +297,10 @@ public class RollBot extends ListenerAdapter {
                 }
 
                 msg = clearRollFromFuckingRussianLetters(msg);
-                if (msg.charAt(0) == 'd' || msg.charAt(0) == 'D') {
+                if (msg.charAt(0) == 'd') {
                     // кинуть кость
                     rollCommand(event, msg);
-                } else if (msg.charAt(0) == 'r' || msg.charAt(0) == 'R') {
+                } else if (msg.charAt(0) == 'r') {
                     // кинуть выражение
                     rollCommand(event, msg.substring(1));
                 }
@@ -316,44 +309,24 @@ public class RollBot extends ListenerAdapter {
     }
 
 
-    private String clearRollFromFuckingRussianLetters(String rollString ){
-        //System.out.println(rollString);
-        //System.out.println(rollString.toLowerCase(new Locale("ru","RU")));// todo не работает
+    private String clearRollFromFuckingRussianLetters(String rollString) {
+        // получаем волшебные символы для проверок, из кодировки windows-1251
+        // todo все исправил, просто убери этот код
 
 
-//        StringBuilder builder = new StringBuilder(rollString);
-//        if(builder.charAt())
-//
-//        System.out.println("aaaa1:"+rollString.charAt(0)+rollString.charAt(1));
-//        System.out.println("aaaa2:"+builder.charAt(0));
-//        System.out.println("aaaa3:"+builder.toString().charAt(0));
-//        System.out.println("aaaa4:"+rollString.length());
-//
-//        System.out.println(".к3к:" + (new String(".к3к")).length());
-//
-
-        System.out.println(Arrays.toString((new String(".к3к")).getBytes(StandardCharsets.UTF_8)));
-
-        //builder.indexOf("k");
+        // переводим все в нижний регистр
+        StringBuilder builder = new StringBuilder(rollString.toLowerCase());
 
         // меняем ошибки раскладки в выражении
-        if (rollString.startsWith("к"))
-            rollString = rollString.replaceFirst("к", "r");
-        rollString = rollString.replaceAll("в", "d");
-        rollString = rollString.replaceAll("В", "d");
+        if (rollString.charAt(0) == 'к' || rollString.charAt(0) == 'р')
+            builder.setCharAt(0, 'r');
 
-        // меняем русское обозначение
-        rollString = rollString.replaceAll("к", "d");
-        rollString = rollString.replaceAll("К", "d");
-        rollString = rollString.replaceAll("д", "d");
-        rollString = rollString.replaceAll("Д", "d");
-        rollString = rollString.replaceAll("р", "r");
-        rollString = rollString.replaceAll("Р", "r");
+        // все варианты обозначения кости
+        for (int symbolI = 0; symbolI < builder.length(); symbolI++)
+            if (builder.charAt(symbolI) == 'к' || builder.charAt(symbolI) == 'в' || builder.charAt(symbolI) == 'д')
+                builder.setCharAt(symbolI, 'd');
 
-        // заглавные буквы
-        rollString = rollString.replaceAll("R", "r");
-        rollString = rollString.replaceAll("D", "d");
-        return rollString;
+        return builder.toString();
     }
 
     // ========================================= команды =========================================
@@ -379,14 +352,14 @@ public class RollBot extends ListenerAdapter {
                     "За все время работы бота в этой гильдии, пока никто не выкинул ни одной единицы или двадцатки"
             );
         } else {
-            // формиируем статистику
+            // формируем статистику
             StringBuilder stat = new StringBuilder("Статистика для тех, кто онлайн:\nЗа эту игру:\n ======== Единицы: ======== \n");
             for (PlayerData playersDatum : playersData) {
                 if (playersDatum.numberOfOnes > 0) {
 
                     // получаем имя игрока
                     if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                        stat.append(StringConstants.getUNICODE((Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId))).getEffectiveName()))
+                        stat.append((Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId))).getEffectiveName())
                                 .append(" - ").append(playersDatum.numberOfOnes).append('\n');
                 }
             }
@@ -395,7 +368,7 @@ public class RollBot extends ListenerAdapter {
                 if (playersDatum.numberOfTwenties > 0) {
                     // получаем имя игрока
                     if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                        stat.append(StringConstants.getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                        stat.append(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName())
                                 .append(" - ").append(playersDatum.numberOfTwenties).append('\n');
                 }
             }
@@ -406,7 +379,7 @@ public class RollBot extends ListenerAdapter {
                 if (playersDatum.allNumberOfOnes > 0) {
                     // получаем имя игрока
                     if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                        stat.append(StringConstants.getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                        stat.append(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName())
                                 .append(" - ").append(playersDatum.allNumberOfOnes).append('\n');
                 }
             }
@@ -415,7 +388,7 @@ public class RollBot extends ListenerAdapter {
                 if (playersDatum.allNumberOfTwenties > 0) {
                     // получаем имя игрока
                     if (event.getGuild().getMemberById(playersDatum.playerId) != null)
-                        stat.append(StringConstants.getUNICODE(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName()))
+                        stat.append(Objects.requireNonNull(event.getGuild().getMemberById(playersDatum.playerId)).getEffectiveName())
                                 .append(" - ").append(playersDatum.allNumberOfTwenties).append('\n');
                 }
             }
@@ -427,7 +400,7 @@ public class RollBot extends ListenerAdapter {
 
     void debugCommand(MessageReceivedEvent event) {
         StringBuilder answer = new StringBuilder("Сервер: ")
-                .append(StringConstants.getUNICODE(event.getGuild().getName()))
+                .append(event.getGuild().getName())
                 .append(" (")
                 .append(event.getGuild().getIdLong())
                 .append(")\nУчастники онлайн:");
@@ -435,7 +408,7 @@ public class RollBot extends ListenerAdapter {
         List<Member> members = event.getGuild().getMembers();
         for (Member member : members) {
             answer.append("\n\t ")
-                    .append(StringConstants.getUNICODE(member.getEffectiveName()))
+                    .append(member.getEffectiveName())
                     .append(" (")
                     .append(member.getIdLong())
                     .append(')');
@@ -453,10 +426,10 @@ public class RollBot extends ListenerAdapter {
                     Objects.requireNonNull(
                             event.getJDA().getGuildById(Long.parseLong(msg.substring(4, 22)))
                     ).getTextChannelById(Long.parseLong(msg.substring(23, 41)))
-            ).sendMessage(StringConstants.getUTF_8(msg.substring(41))).queue();
+            ).sendMessage(msg.substring(41)).queue();
         } catch (NullPointerException e) {
             sendMessageInEventChannel(event, "no such guild/channel error");
-        } catch (java.lang.NumberFormatException e) {
+        } catch (NumberFormatException e) {
             sendMessageInEventChannel(event, "input numbers error");
         }
         // /fun 503170361903284245 689517268732084238 сообщение
@@ -562,7 +535,11 @@ public class RollBot extends ListenerAdapter {
             e.printStackTrace();
         }
 
-        System.exit(0);
+        // Эта команда мягко говорит закрыться всем внутренним процессам дискорда,
+        //  после закрытия сама программа будет работать еще секунд 10
+        //  есть еще более агрессивная shutdownNow(), которая работает чуть быстрее
+        //  и не рекомендую использовать System.exit(0);
+        event.getJDA().shutdown();
     }
 
     // =========================================== кости ===========================================
@@ -631,9 +608,9 @@ public class RollBot extends ListenerAdapter {
 
     String getAuthorName(MessageReceivedEvent event) {
         if (event.isFromType(ChannelType.PRIVATE)) {// личное сообщение
-            return StringConstants.getUNICODE(event.getAuthor().getName());
+            return event.getAuthor().getName();
         } else {// сообщение с сервера (обращаемся по нику а не по имени)
-            return StringConstants.getUNICODE(Objects.requireNonNull(event.getMember()).getEffectiveName());
+            return Objects.requireNonNull(event.getMember()).getEffectiveName();
         }
     }
 
@@ -705,7 +682,7 @@ public class RollBot extends ListenerAdapter {
             guild.rollChannelId = -1;
             try {
                 guild.rollChannelId = rootObject.get("roll_channel").getAsLong();
-            } catch (java.lang.NumberFormatException e) {
+            } catch (NumberFormatException e) {
                 System.out.println(TAG + ": guild=" + guildId + " no roll_channel = " +
                         rootObject.get("roll_channel").getAsString());
             }
@@ -713,7 +690,7 @@ public class RollBot extends ListenerAdapter {
             // и главный куб
             try {
                 guild.masterDice = rootObject.get("master_dice").getAsInt();
-            } catch (java.lang.NumberFormatException e) {
+            } catch (NumberFormatException e) {
                 System.out.println(TAG + ": guild=" + guildId + " no master_dice = " +
                         rootObject.get("master_dice").getAsString());
             }
@@ -832,7 +809,7 @@ public class RollBot extends ListenerAdapter {
         try {
             // чтение главного объекта
             rootObject = JsonParser.parseString(contains.toString()).getAsJsonObject();
-        } catch (java.lang.IllegalStateException e) {
+        } catch (IllegalStateException e) {
             e.printStackTrace();
             // если структуры в файле нет, создаем новую со значениями по умолчанию
             System.out.println(TAG + ": create new json structure");
@@ -893,7 +870,7 @@ public class RollBot extends ListenerAdapter {
     // ================= новое от 20.06.2021 ===========================================================================
 
     void sendMessageInEventChannel(MessageReceivedEvent event, String message) {
-        event.getChannel().sendMessage(StringConstants.getUTF_8(message)).queue();
+        event.getChannel().sendMessage(message).queue();
     }
 
 }
